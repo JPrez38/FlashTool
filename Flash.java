@@ -216,7 +216,7 @@ class Flash extends JFrame implements ActionListener, WindowListener{
             try { 
                 checkBuild();
                 publish(new Log("Flashing Device. Please do not interupt!"));
-                //flashDevice();
+                flashDevice();
             } catch (Exception t){}
             return null;
         }
@@ -297,11 +297,11 @@ class Flash extends JFrame implements ActionListener, WindowListener{
                     System.out.println(d +"DSFSD");
 
                     String path = new File(".").getCanonicalPath();
-                    String buildPath =  path + "/release-user";
+                    String buildPath =  path + "\\release-user";
 					System.out.println(path + "dfdds");
 
-                    String kill = "adb kill-server";
-                    String start = "adb devices";
+                    String kill = path + "\\adb kill-server";
+                    String start = path + "\\adb devices";
                     //String append = "echo 0x2836 >> \"" + "%USERPROFILE%" +"\\.android\\adb_usb.ini";
 					String installDrivers;
                     if (System.getProperty("sun.arch.data.model").equals("32")){
@@ -449,20 +449,35 @@ class Flash extends JFrame implements ActionListener, WindowListener{
 
         public void flashDevice() {
             try {
+                String slash;
+                if (isWindows()) {
+                    slash = "\\";
+                }
+                else {
+                    slash="/";
+                }
+
                 String path = new File(".").getCanonicalPath();
-                String buildPath =  path + "/release-user";
+                String buildPath =  path + slash+ "release-user";
 				System.out.println(buildPath);
-                String[] devices = new String[]{ path,"/adb", " devices"};
-                String[] rebootBootloader = new String[]{ path,"/adb", " reboot", " bootloader"};
-                String[] flashSystem = new String[]{ path, "/fastboot"," flash", " system ", buildPath +"/system.img"};
-                String[] fastBootRebootBootLoader = new String[]{ path, "/fastboot", " reboot-bootloader"};
+                String[] devices = new String[]{ path, slash, "adb", " devices"};
+                String[] rebootBootloader = new String[]{ path,slash,"adb", " reboot", " bootloader"};
+                String[] flashSystem = new String[]{ path, slash,"fastboot"," flash", " system ", buildPath + slash + "system.img"};
+                String[] fastBootRebootBootLoader = new String[]{ path, slash,"fastboot", " reboot-bootloader"};
 
-                String[] sleep = new String[]{"sleep"," 0.5"};
+                //String[] sleep = new String[]{"sleep"," 0.5"};
 
-                String[] formatCache = new String[]{ path, "/fastboot", " format", " cache"};
-                String[] formatUserData = new String[]{ path, "/fastboot"," format", " userdata"};
-                String[] fastBootReboot = new String[]{ path, "/fastboot", " reboot"};
-                String[] removeZip = new String[]{"rm ", outputZip};
+                String[] formatCache = new String[]{ path,slash, "fastboot", " format", " cache"};
+                String[] formatUserData = new String[]{ path,slash, "fastboot"," format", " userdata"};
+                String[] fastBootReboot = new String[]{ path,slash, "fastboot", " reboot"};
+                String[] removeZip;
+                if (isMac()) {
+                    removeZip = new String[]{"rm ", outputZip};
+                }
+                else {
+                    removeZip = new String[]{"del ", outputZip};
+                }
+                
                 //String[] removeBuild = new String[]{"rm ", "-rf ", "release-user"};
 
                 String[][] commands = new String[][]{devices,rebootBootloader,flashSystem,fastBootRebootBootLoader,
