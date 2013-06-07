@@ -2,9 +2,7 @@
   <dpinst> 
 
 <suppressAddRemovePrograms/>
-<forceIfDriverIsNotBetter/>
-
-
+<quietInstall/>
 
 
 <!-- The following search and subDirectory elements direct 
@@ -12,7 +10,7 @@
      packages. --> 
     <search> 
       <subDirectory>*</subDirectory> 
-    </search> s
+    </search> 
 
 <!-- The following language element localizes its child elements 
      for the English (Standard) language. The child elements 
@@ -28,4 +26,3 @@
     <scanHardware/>
 
 </dpinst>
-

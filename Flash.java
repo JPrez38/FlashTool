@@ -6,7 +6,7 @@ import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.ImageIcon;
-import javax.swing.JPanel; 
+import javax.swing.JPanel;
 import javax.swing.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -60,6 +60,7 @@ import java.io.FileWriter;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.util.Scanner;
+import java.io.BufferedInputStream;
 
 class Flash extends JFrame implements ActionListener, WindowListener{
 	  private static final int  BUFFER_SIZE = 4096;
@@ -71,27 +72,29 @@ class Flash extends JFrame implements ActionListener, WindowListener{
     private JPanel contentPane;
     String operatingSystem;
     public static String OS = System.getProperty("os.name").toLowerCase();
+	public boolean deviceFound;
+	public boolean flashing;
 
     public Flash() {
         init();
     }
 
     public void init() {
-        addWindowListener(this); 
+        addWindowListener(this);
         setTitle("Ouya Flash Tool\n");
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setBounds(100, 100, 640, 480);
         contentPane = new JPanel();
         contentPane.setBorder(new EmptyBorder(5, 5, 5, 5));
         setContentPane(contentPane);
-        
+
         progressBar = new JProgressBar();
-        
+
         JButton btnNewButton = new JButton("Flash");
         btnNewButton.setActionCommand("Flash");
         btnNewButton.addActionListener(this);
 
-        
+
         JButton btnKill = new JButton("kill");
         btnKill.setActionCommand("kill");
         btnKill.addActionListener(this);
@@ -100,12 +103,12 @@ class Flash extends JFrame implements ActionListener, WindowListener{
         textArea.setLineWrap(true);
         textArea.setWrapStyleWord(true);
         JScrollPane scrollPane = new JScrollPane(textArea);
-        
+
         ImageIcon image = new ImageIcon("Ouya.png");
         JLabel label = new JLabel("", image, JLabel.CENTER);
-        
+
         JCheckBox chckbxClearCache = new JCheckBox("Clear Cache");
-        
+
         JCheckBox chckbxClearUserData = new JCheckBox("Clear User Data");
         GroupLayout gl_contentPane = new GroupLayout(contentPane);
         gl_contentPane.setHorizontalGroup(
@@ -160,22 +163,26 @@ class Flash extends JFrame implements ActionListener, WindowListener{
     }
 
     public void actionPerformed(ActionEvent e) {
-        if ("Flash" == e.getActionCommand()) {  
-            try { 
-                (update = new Update()).execute();
+        if ("Flash" == e.getActionCommand()) {
+            try {
+				if (flashing == false) {
+					flashing =true;
+					(update = new Update()).execute();
+				}
             } catch (Exception t){}
         }
         if ("kill" == e.getActionCommand()) {
             int confirmed = JOptionPane.showConfirmDialog(null,
             "Warning! Quiting during flash could endanger hardware! \n" +
-            "Do you still wish to quit?", "Confirm Quit", 
-            JOptionPane.YES_NO_OPTION); 
+            "Do you still wish to quit?", "Confirm Quit",
+            JOptionPane.YES_NO_OPTION);
 
-            if (confirmed == JOptionPane.YES_OPTION) {                              
-                dispose(); 
-            } 
+            if (confirmed == JOptionPane.YES_OPTION) {
+                dispose();
+            }
+			else {}
         }
-    } 
+    }
 
     public void windowActivated(WindowEvent e) {}
     public void windowClosed(WindowEvent e) {}
@@ -187,12 +194,13 @@ class Flash extends JFrame implements ActionListener, WindowListener{
     public void windowClosing(WindowEvent winEvt) {
         int confirmed = JOptionPane.showConfirmDialog(null,
           "Warning! Quiting during flash could endanger hardware! \n" +
-          "Do you still wish to quit?", "Confirm Quit", 
-        JOptionPane.YES_NO_OPTION); 
+          "Do you still wish to quit?", "Confirm Quit",
+        JOptionPane.YES_NO_OPTION);
 
-        if (confirmed == JOptionPane.YES_OPTION) {                              
-            dispose(); 
-        } 
+        if (confirmed == JOptionPane.YES_OPTION) {
+            dispose();
+        }
+		else {}
     }
 
     public static void main(String[] args){
@@ -213,10 +221,17 @@ class Flash extends JFrame implements ActionListener, WindowListener{
     private class Update extends SwingWorker<Void, Log> {
         @Override
         protected Void doInBackground() {
-            try { 
+            try {
                 checkBuild();
                 publish(new Log("Flashing Device. Please do not interupt!"));
-                flashDevice();
+				//if (deviceFound){
+				flashDevice();
+				//}
+
+				progressBar.setValue(100);
+				publish(new Log("Flashing Complete, you may now disconnect console"));
+				Thread.sleep(2000);
+				flashing=false;
             } catch (Exception t){}
             return null;
         }
@@ -258,13 +273,13 @@ class Flash extends JFrame implements ActionListener, WindowListener{
                 android.mkdirs();
                 String usb = android + "/adb_usb.ini";
 
-                
+
                 File file = new File(usb);
                 if (!file.exists()) {
                     file.createNewFile();
                 }
 
-                
+
                 Scanner readFile = new Scanner(file);
                 readFile.useDelimiter("\\s+");
                 while(readFile.hasNext()) {
@@ -277,7 +292,7 @@ class Flash extends JFrame implements ActionListener, WindowListener{
                 if (!f){
                     FileWriter fileWriter = new FileWriter(file,true);
                     BufferedWriter bufferWritter = new BufferedWriter(fileWriter);
-                    bufferWritter.write(data+"\n");
+                    bufferWritter.write(data);
                     bufferWritter.close();
                     System.out.println("done");
                 }
@@ -285,7 +300,7 @@ class Flash extends JFrame implements ActionListener, WindowListener{
         }
 
         public void addDevice(){
-            
+            publish(new Log("Adding device to computer..."));
             if (isMac()) {
                 try {
                     editINIFile();
@@ -294,29 +309,24 @@ class Flash extends JFrame implements ActionListener, WindowListener{
             if (isWindows()){
                 try {
                     String d = System.getProperty("user.home");
-                    System.out.println(d +"DSFSD");
 
                     String path = new File(".").getCanonicalPath();
                     String buildPath =  path + "\\release-user";
-					System.out.println(path + "dfdds");
 
-                    String kill = path + "\\adb kill-server";
-                    String start = path + "\\adb devices";
+                    String kill = path + "\\adb.exe kill-server";
+                    String start = path + "\\adb.exe devices";
+					//System.out.println(kill + "\n" + start);
+					//String kill = "adb kill-server";
+                    //String start = "adb devices";
                     //String append = "echo 0x2836 >> \"" + "%USERPROFILE%" +"\\.android\\adb_usb.ini";
 					String installDrivers;
                     if (System.getProperty("sun.arch.data.model").equals("32")){
 						 installDrivers = path + "\\NewDrivers\\dpinst32.exe";
 					}
 					else {
-						installDrivers = path + "\\NewDrivers\\dpinst.exe";
+						installDrivers = path + "\\NewDrivers\\dpinst.exe /c";
 					}
 					System.out.println(installDrivers);
-
-                    runProcess(kill);
-                    editINIFile();
-                    //runProcess(append);
-                    runProcess(start);
-                    //runProcess(installDrivers);
 					Runtime load = Runtime.getRuntime();
 					try {
 						load.exec(installDrivers);
@@ -324,30 +334,50 @@ class Flash extends JFrame implements ActionListener, WindowListener{
 						ex.printStackTrace();
 						System.out.println("failed");
 					}
+                    //runProcess(kill,false);
+					Thread.sleep(3000);
+                    editINIFile();
+                    //runProcess(append);
+                    runProcess(start,false);
+                    //runProcess(installDrivers);
+
                 }catch (Exception e){}
             }
+			publish(new Log("Device added"));
         }
 
-        public void runProcess(String s) {
+		public void runProcess(String s){
+			runProcess(s,true);
+		}
+
+        public void runProcess(String s, Boolean print) {
             try {
                 Process p = Runtime.getRuntime().exec(s);
+				while(print){
+					BufferedReader stdInput = new BufferedReader(new
+					  InputStreamReader(p.getInputStream()));
 
-                BufferedReader stdInput = new BufferedReader(new 
-                  InputStreamReader(p.getInputStream()));
+					BufferedReader stdError = new BufferedReader(new
+						InputStreamReader(p.getErrorStream()));
 
-                BufferedReader stdError = new BufferedReader(new 
-                    InputStreamReader(p.getErrorStream()));
+					// read the output from the command
+					while ((s = stdInput.readLine()) != null) {
+						publish(new Log(s));
+						System.out.println("hang");
+					}
 
-                // read the output from the command
-                while ((s = stdInput.readLine()) != null) {
-                    publish(new Log(s));
-                }
-                
-                // read any errors from the attempted command
-                while ((s = stdError.readLine()) != null) {
-                    publish(new Log(s));
-                }
+					// read any errors from the attempted command
+					while ((s = stdError.readLine()) != null) {
+						publish(new Log(s));
+
+					}
+
+					stdInput.close();
+					stdError.close();
+				}
+				p.waitFor();
             } catch (Exception e){}
+
         }
 
         public void getOperatingSystem() {
@@ -363,7 +393,7 @@ class Flash extends JFrame implements ActionListener, WindowListener{
         public boolean isWindows() {
             return (OS.indexOf("win") >= 0);
         }
- 
+
         public boolean isMac() {
             return (OS.indexOf("mac") >= 0);
         }
@@ -382,7 +412,7 @@ class Flash extends JFrame implements ActionListener, WindowListener{
             File zip = new File(outputZip);
             File output = new File(".");
             publish(new Log("Extracting zip file"));
-            extract(zip,output); 
+            extract(zip,output);
         }
 
         // Read all available bytes from one channel and copy them to the other.
@@ -449,63 +479,67 @@ class Flash extends JFrame implements ActionListener, WindowListener{
 
         public void flashDevice() {
             try {
+				Thread.sleep(2000);
+				String[] removeZip;
                 String slash;
+				String extension;
                 if (isWindows()) {
                     slash = "\\";
+					removeZip = new String[]{"del ", outputZip};
+					extension = ".exe";
                 }
                 else {
                     slash="/";
+					removeZip = new String[]{"rm ", outputZip};
+					extension = "";
                 }
 
                 String path = new File(".").getCanonicalPath();
                 String buildPath =  path + slash+ "release-user";
 				System.out.println(buildPath);
-                String[] devices = new String[]{ path, slash, "adb", " devices"};
-                String[] rebootBootloader = new String[]{ path,slash,"adb", " reboot", " bootloader"};
-                String[] flashSystem = new String[]{ path, slash,"fastboot"," flash", " system ", buildPath + slash + "system.img"};
-                String[] fastBootRebootBootLoader = new String[]{ path, slash,"fastboot", " reboot-bootloader"};
+				String[] waitForDevice = new String[]{path,slash, "adb", extension, " wait-for-device"};
+                String[] devices = new String[]{ path, slash, "adb",extension, " devices"};
+                String[] rebootBootloader = new String[]{ path,slash,"adb",extension, " reboot", " bootloader"};
+                String[] flashSystem = new String[]{ path, slash,"fastboot",extension," flash", " system ", buildPath + slash + "system.img"};
+                String[] fastBootRebootBootLoader = new String[]{ path, slash,"fastboot",extension, " reboot-bootloader"};
 
-                //String[] sleep = new String[]{"sleep"," 0.5"};
+                String[] sleep = new String[]{"echo"," taking a nap"};
 
-                String[] formatCache = new String[]{ path,slash, "fastboot", " format", " cache"};
-                String[] formatUserData = new String[]{ path,slash, "fastboot"," format", " userdata"};
-                String[] fastBootReboot = new String[]{ path,slash, "fastboot", " reboot"};
-                String[] removeZip;
-                if (isMac()) {
-                    removeZip = new String[]{"rm ", outputZip};
-                }
-                else {
-                    removeZip = new String[]{"del ", outputZip};
-                }
-                
+                String[] formatCache = new String[]{ path,slash, "fastboot",extension, " format", " cache"};
+                String[] formatUserData = new String[]{ path,slash, "fastboot",extension," format", " userdata"};
+                String[] fastBootReboot = new String[]{ path,slash, "fastboot",extension, " reboot"};
+
                 //String[] removeBuild = new String[]{"rm ", "-rf ", "release-user"};
 
-                String[][] commands = new String[][]{devices,rebootBootloader,flashSystem,fastBootRebootBootLoader,
+                String[][] commands = new String[][]{waitForDevice,rebootBootloader,flashSystem,fastBootRebootBootLoader,sleep,
                   formatCache,formatUserData,fastBootReboot,removeZip};
-				//String[][] commands = new String[][]{devices};
-                
-                
+				//String[][] commands = new String[][]{waitForDevice,rebootBootloader,fastBootReboot};
+
+
                 for (int i = 0; i < commands.length; i++){
-                    String s = null;        
+                    String s = null;
                     String a ="";
                     for (int j = 0;j<commands[i].length ;j++) {
                         a+=commands[i][j];
                     }
+					if (commands[i]==sleep){
+						Thread.sleep(500);
+					}
                     //prints the command
                     //System.out.println(a);
                     /*Process p = Runtime.getRuntime().exec(a);
-                    
-                    BufferedReader stdInput = new BufferedReader(new 
+
+                    BufferedReader stdInput = new BufferedReader(new
                       InputStreamReader(p.getInputStream()));
 
-                    BufferedReader stdError = new BufferedReader(new 
+                    BufferedReader stdError = new BufferedReader(new
                         InputStreamReader(p.getErrorStream()));
 
                     // read the output from the command
                     while ((s = stdInput.readLine()) != null) {
                         publish(new Log(s));
                     }
-                    
+
                     // read any errors from the attempted command
                     while ((s = stdError.readLine()) != null) {
                         publish(new Log(s));
@@ -513,7 +547,7 @@ class Flash extends JFrame implements ActionListener, WindowListener{
                     runProcess(a);
                 }
             }catch (Exception e){}
-                System.exit(0);
+                //System.exit(0);
         }
     }
 }
