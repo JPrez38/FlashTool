@@ -1,79 +1,55 @@
-import javax.swing.JFrame;
-import javax.swing.JButton;
-import javax.swing.JTextArea;
-import javax.swing.JScrollPane;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.ImageIcon;
 import javax.swing.JPanel;
-import javax.swing.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.io.IOException;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.net.URL;
-import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
-import java.nio.channels.ReadableByteChannel;
-import java.nio.channels.WritableByteChannel;
-import java.io.BufferedOutputStream;
-import java.io.File;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
-import java.awt.event.WindowEvent;
-import java.awt.event.WindowListener;
-import java.awt.GridLayout;
-import javax.swing.border.Border;
-import javax.swing.BorderFactory;
-import java.util.List;
-import java.awt.Container;
-import java.awt.*;
-import java.awt.Dimension;
-
-import java.awt.BorderLayout;
-import java.awt.EventQueue;
-
-import javax.swing.JFrame;
-import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
 import javax.swing.GroupLayout;
 import javax.swing.GroupLayout.Alignment;
-import javax.swing.JScrollBar;
-import javax.swing.JTextPane;
 import javax.swing.LayoutStyle.ComponentPlacement;
 import javax.swing.JProgressBar;
 import javax.swing.JButton;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JLabel;
-import javax.swing.ImageIcon;
 import javax.swing.JCheckBox;
-import javax.swing.JToolBar;
 import javax.swing.JFrame;
-
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.WindowEvent;
+import java.awt.event.WindowListener;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.List;
+import java.net.URL;
 import java.util.Scanner;
-import java.io.BufferedInputStream;
+
 
 class Flash extends JFrame implements ActionListener, WindowListener{
-	  private static final int  BUFFER_SIZE = 4096;
-	  private static JTextArea textArea;
+	private static final int  BUFFER_SIZE = 4096;
+	private static JTextArea textArea;
     private static JProgressBar progressBar;
-	  String outputZip = "OuyaBuild.zip";
-    private JButton startButton;
-    Update update;
     private JPanel contentPane;
-    String operatingSystem;
-    public static String OS = System.getProperty("os.name").toLowerCase();
-	public boolean deviceFound;
-	public boolean flashing;
+    String OS = System.getProperty("os.name").toLowerCase();
+    boolean flashing;
+    JCheckBox chckbxClearCache;
+    JCheckBox chckbxClearUserData;
+    String outputZip = "OuyaBuild.zip";
+    Update update;
+
 
     public Flash() {
         init();
@@ -87,13 +63,11 @@ class Flash extends JFrame implements ActionListener, WindowListener{
         contentPane = new JPanel();
         contentPane.setBorder(new EmptyBorder(5, 5, 5, 5));
         setContentPane(contentPane);
-
         progressBar = new JProgressBar();
 
         JButton btnNewButton = new JButton("Flash");
         btnNewButton.setActionCommand("Flash");
         btnNewButton.addActionListener(this);
-
 
         JButton btnKill = new JButton("kill");
         btnKill.setActionCommand("kill");
@@ -107,9 +81,12 @@ class Flash extends JFrame implements ActionListener, WindowListener{
         ImageIcon image = new ImageIcon("Ouya.png");
         JLabel label = new JLabel("", image, JLabel.CENTER);
 
-        JCheckBox chckbxClearCache = new JCheckBox("Clear Cache");
+        chckbxClearCache = new JCheckBox("Clear Cache");
+        chckbxClearCache.setSelected(true);
 
-        JCheckBox chckbxClearUserData = new JCheckBox("Clear User Data");
+        chckbxClearUserData = new JCheckBox("Clear User Data");
+        chckbxClearUserData.setSelected(true);
+
         GroupLayout gl_contentPane = new GroupLayout(contentPane);
         gl_contentPane.setHorizontalGroup(
           gl_contentPane.createParallelGroup(Alignment.TRAILING)
@@ -123,7 +100,7 @@ class Flash extends JFrame implements ActionListener, WindowListener{
                 .addGroup(gl_contentPane.createSequentialGroup()
                   .addGroup(gl_contentPane.createParallelGroup(Alignment.LEADING)
                     .addGroup(gl_contentPane.createSequentialGroup()
-                      .addGap(42)
+                      .addGap(30)
                       .addComponent(label, GroupLayout.PREFERRED_SIZE, 305, GroupLayout.PREFERRED_SIZE))
                     .addGroup(gl_contentPane.createSequentialGroup()
                       .addGap(28)
@@ -222,14 +199,20 @@ class Flash extends JFrame implements ActionListener, WindowListener{
         @Override
         protected Void doInBackground() {
             try {
+                long startTime = System.currentTimeMillis();
+                publish(new Log("Preparing to Flash. Process may take several minutes.\nWARNING:" + 
+                    " Please do not turn off the console or stop the flashing process"));
                 checkBuild();
+                addDevice();
                 publish(new Log("Flashing Device. Please do not interupt!"));
-				//if (deviceFound){
+                progressBar.setValue(30);
+
 				flashDevice();
-				//}
 
 				progressBar.setValue(100);
-				publish(new Log("Flashing Complete, you may now disconnect console"));
+				publish(new Log("Flashing Complete! You may now disconnect your console"));
+                long finishTime = System.currentTimeMillis();
+                publish(new Log("[TOTAL TIME: " + (finishTime-startTime)/1000.0 + "s]"));
 				Thread.sleep(2000);
 				flashing=false;
             } catch (Exception t){}
@@ -243,62 +226,86 @@ class Flash extends JFrame implements ActionListener, WindowListener{
             }
         }
 
+        public void runProcess(String s){
+            runProcess(s,true);
+        }
+
+        public void runProcess(String s, Boolean print) {
+            try {
+                Process p = Runtime.getRuntime().exec(s);
+                while(print){
+                    BufferedReader stdInput = new BufferedReader(new
+                      InputStreamReader(p.getInputStream()));
+
+                    BufferedReader stdError = new BufferedReader(new
+                        InputStreamReader(p.getErrorStream()));
+
+                    // read the output from the command
+                    while ((s = stdInput.readLine()) != null) {
+                        publish(new Log(s));
+                    }
+
+                    // read any errors from the attempted command
+                    while ((s = stdError.readLine()) != null) {
+                        publish(new Log(s));
+
+                    }
+
+                    stdInput.close();
+                    stdError.close();
+                }
+                p.waitFor();
+            } catch (Exception e){}
+
+        }
+
+        public boolean isWindows() {
+            return (OS.indexOf("win") >= 0);
+        }
+
+        public boolean isMac() {
+            return (OS.indexOf("mac") >= 0);
+        }
+
         public void checkBuild() {
             try {
-                getOperatingSystem();
-                System.out.println(operatingSystem);
-                publish(new Log("Searching for local build"));
+                publish(new Log("Searching for local build..."));
                 File localBuild = new File("./release-user");
                 if (!localBuild.exists()){
-                    publish(new Log("local build not found"));
+                    publish(new Log("Local build not found"));
                     getZip();
                 }
                 else {
-                    publish(new Log("local build found"));
-                    progressBar.setValue(50);
+                    publish(new Log("Local build found"));
                 }
-                addDevice();
+                progressBar.setValue(20);
+                
             } catch(Exception e){}
         }
 
-        public void editINIFile() {
+        private String readUrl(String urlString) throws Exception {
+            BufferedReader reader = null;
             try {
-                String data = "0x2836";
-                boolean f =false;
-                String d = System.getProperty("user.home");
-                System.out.println(d);
-
-                String x = d + "/.android";
-                File android = new File(x);
-                android.mkdirs();
-                String usb = android + "/adb_usb.ini";
-
-
-                File file = new File(usb);
-                if (!file.exists()) {
-                    file.createNewFile();
+                URL url = new URL(urlString);
+                reader = new BufferedReader(new InputStreamReader(url.openStream()));
+                StringBuffer buffer = new StringBuffer();
+                int read;
+                char[] chars = new char[1024];
+                while ((read = reader.read(chars)) != -1) {
+                    buffer.append(chars, 0, read); 
                 }
-
-
-                Scanner readFile = new Scanner(file);
-                readFile.useDelimiter("\\s+");
-                while(readFile.hasNext()) {
-                    String z= readFile.next();
-                    if(data.equals(z))
-                    {
-                        f=true;
-                    }
+                    
+                return buffer.toString();
+            } finally {
+                if (reader != null) {
+                    reader.close();
                 }
-                if (!f){
-                    FileWriter fileWriter = new FileWriter(file,true);
-                    BufferedWriter bufferWritter = new BufferedWriter(fileWriter);
-                    bufferWritter.write(data);
-                    bufferWritter.close();
-                    System.out.println("done");
-                }
-            } catch (Exception e) {}
+            }
         }
 
+        /* Method is used to add the device to 
+        *  the computer
+        */
         public void addDevice(){
             publish(new Log("Adding device to computer..."));
             if (isMac()) {
@@ -315,10 +322,6 @@ class Flash extends JFrame implements ActionListener, WindowListener{
 
                     String kill = path + "\\adb.exe kill-server";
                     String start = path + "\\adb.exe devices";
-					//System.out.println(kill + "\n" + start);
-					//String kill = "adb kill-server";
-                    //String start = "adb devices";
-                    //String append = "echo 0x2836 >> \"" + "%USERPROFILE%" +"\\.android\\adb_usb.ini";
 					String installDrivers;
                     if (System.getProperty("sun.arch.data.model").equals("32")){
 						 installDrivers = path + "\\NewDrivers\\dpinst32.exe";
@@ -326,81 +329,68 @@ class Flash extends JFrame implements ActionListener, WindowListener{
 					else {
 						installDrivers = path + "\\NewDrivers\\dpinst.exe /c";
 					}
-					System.out.println(installDrivers);
+                    publish(new Log("Installing Windows drivers..."));
 					Runtime load = Runtime.getRuntime();
 					try {
 						load.exec(installDrivers);
                     } catch (Exception ex){
 						ex.printStackTrace();
-						System.out.println("failed");
+						publish(new Log("Failed to install drivers"));
 					}
-                    //runProcess(kill,false);
 					Thread.sleep(3000);
                     editINIFile();
-                    //runProcess(append);
+
                     runProcess(start,false);
-                    //runProcess(installDrivers);
 
                 }catch (Exception e){}
             }
 			publish(new Log("Device added"));
         }
 
-		public void runProcess(String s){
-			runProcess(s,true);
-		}
-
-        public void runProcess(String s, Boolean print) {
+        /* This method edits the .ini file to append the device ID so it can
+        *  be found by android
+        */
+        public void editINIFile() {
             try {
-                Process p = Runtime.getRuntime().exec(s);
-				while(print){
-					BufferedReader stdInput = new BufferedReader(new
-					  InputStreamReader(p.getInputStream()));
+                String data = "0x2836";
+                boolean deviceNumberFound =false;
+                String userHome = System.getProperty("user.home");
 
-					BufferedReader stdError = new BufferedReader(new
-						InputStreamReader(p.getErrorStream()));
+                String dotAndroid = userHome + "/.android";
+                File android = new File(dotAndroid);
+                android.mkdirs();
+                String usb = android + "/adb_usb.ini";
 
-					// read the output from the command
-					while ((s = stdInput.readLine()) != null) {
-						publish(new Log(s));
-						System.out.println("hang");
-					}
+                //creates the .ini file if it doesn't exist
+                File file = new File(usb);
+                if (!file.exists()) {
+                    file.createNewFile();
+                }
 
-					// read any errors from the attempted command
-					while ((s = stdError.readLine()) != null) {
-						publish(new Log(s));
+                Scanner readFile = new Scanner(file);
+                readFile.useDelimiter("\\s+");
 
-					}
+                // Searches for the device idea to see if its in document
+                while(readFile.hasNext()) {
+                    String fileWord= readFile.next();
+                    if(data.equals(fileWord))
+                    {
+                        deviceNumberFound=true;
+                    }
+                }
 
-					stdInput.close();
-					stdError.close();
-				}
-				p.waitFor();
-            } catch (Exception e){}
-
-        }
-
-        public void getOperatingSystem() {
-            if (isWindows()) {
-                operatingSystem="Windows";
-            } else if (isMac()){
-                operatingSystem="Mac";
-            } else {
-                operatingSystem="Other";
-            }
-        }
-
-        public boolean isWindows() {
-            return (OS.indexOf("win") >= 0);
-        }
-
-        public boolean isMac() {
-            return (OS.indexOf("mac") >= 0);
+                if (!deviceNumberFound){
+                    FileWriter fileWriter = new FileWriter(file,true);
+                    BufferedWriter bufferWritter = new BufferedWriter(fileWriter);
+                    bufferWritter.write(data);
+                    bufferWritter.close();
+                }
+            } catch (Exception e) {}
         }
 
         public void getZip() throws IOException {
             // Open file streams and get channels for them.
-            publish(new Log("Getting file from web server"));
+            publish(new Log("Getting files from web server"));
             URL website = new URL("http://10.0.0.11:8080/RC-OUYA-1.0.264-r1_user.zip");
             ReadableByteChannel in = Channels.newChannel(website.openStream());
             WritableByteChannel out;
@@ -496,7 +486,8 @@ class Flash extends JFrame implements ActionListener, WindowListener{
 
                 String path = new File(".").getCanonicalPath();
                 String buildPath =  path + slash+ "release-user";
-				System.out.println(buildPath);
+
+                //list of bash commands to be executed
 				String[] waitForDevice = new String[]{path,slash, "adb", extension, " wait-for-device"};
                 String[] devices = new String[]{ path, slash, "adb",extension, " devices"};
                 String[] rebootBootloader = new String[]{ path,slash,"adb",extension, " reboot", " bootloader"};
@@ -508,46 +499,43 @@ class Flash extends JFrame implements ActionListener, WindowListener{
                 String[] formatCache = new String[]{ path,slash, "fastboot",extension, " format", " cache"};
                 String[] formatUserData = new String[]{ path,slash, "fastboot",extension," format", " userdata"};
                 String[] fastBootReboot = new String[]{ path,slash, "fastboot",extension, " reboot"};
+                String[][] commands;
 
-                //String[] removeBuild = new String[]{"rm ", "-rf ", "release-user"};
-
-                String[][] commands = new String[][]{waitForDevice,rebootBootloader,flashSystem,fastBootRebootBootLoader,sleep,
-                  formatCache,formatUserData,fastBootReboot,removeZip};
+                if (chckbxClearCache.isSelected() && chckbxClearUserData.isSelected()){
+                    commands = new String[][]{waitForDevice,rebootBootloader,flashSystem,fastBootRebootBootLoader,sleep,
+                     formatCache,formatUserData,fastBootReboot,removeZip};
+                } else if (chckbxClearCache.isSelected() && !chckbxClearUserData.isSelected()){
+                    commands = new String[][]{waitForDevice,rebootBootloader,flashSystem,fastBootRebootBootLoader,sleep,
+                     formatCache,fastBootReboot,removeZip};
+                } else if (chckbxClearUserData.isSelected() && !chckbxClearCache.isSelected()) {
+                    commands = new String[][]{waitForDevice,rebootBootloader,flashSystem,fastBootRebootBootLoader,sleep,
+                     formatUserData,fastBootReboot,removeZip};
+                } else {
+                    commands = new String[][]{waitForDevice,rebootBootloader,flashSystem,fastBootRebootBootLoader,sleep,
+                      fastBootReboot,removeZip};
+                }
 				//String[][] commands = new String[][]{waitForDevice,rebootBootloader,fastBootReboot};
-
-
+                progressBar.setValue(30);
                 for (int i = 0; i < commands.length; i++){
-                    String s = null;
-                    String a ="";
+                    String currentCommand ="";
                     for (int j = 0;j<commands[i].length ;j++) {
-                        a+=commands[i][j];
+                        currentCommand+=commands[i][j];
                     }
 					if (commands[i]==sleep){
 						Thread.sleep(500);
+                        progressBar.setValue(70);
 					}
-                    //prints the command
-                    //System.out.println(a);
-                    /*Process p = Runtime.getRuntime().exec(a);
-
-                    BufferedReader stdInput = new BufferedReader(new
-                      InputStreamReader(p.getInputStream()));
-
-                    BufferedReader stdError = new BufferedReader(new
-                        InputStreamReader(p.getErrorStream()));
-
-                    // read the output from the command
-                    while ((s = stdInput.readLine()) != null) {
-                        publish(new Log(s));
+                    if (commands[i]==formatCache){
+                        progressBar.setValue(75);
+                    }
+                    if (commands[i]==formatUserData){
+                        progressBar.setValue(90);
                     }
 
-                    // read any errors from the attempted command
-                    while ((s = stdError.readLine()) != null) {
-                        publish(new Log(s));
-                    }*/
-                    runProcess(a);
+                    //System.out.println(currentCommand);
+                    runProcess(currentCommand);
                 }
             }catch (Exception e){}
-                //System.exit(0);
         }
     }
 }
