@@ -36,6 +36,9 @@ import java.util.zip.ZipInputStream;
 import java.util.List;
 import java.net.URL;
 import java.util.Scanner;
+import org.json.JSONObject;
+import org.json.JSONArray;
+
 
 
 class Flash extends JFrame implements ActionListener, WindowListener{
@@ -78,7 +81,8 @@ class Flash extends JFrame implements ActionListener, WindowListener{
         textArea.setWrapStyleWord(true);
         JScrollPane scrollPane = new JScrollPane(textArea);
 
-        ImageIcon image = new ImageIcon("Ouya.png");
+        URL url = Flash.class.getResource("Ouya.png");
+        ImageIcon image = new ImageIcon(url);
         JLabel label = new JLabel("", image, JLabel.CENTER);
 
         chckbxClearCache = new JCheckBox("Clear Cache");
@@ -390,19 +394,34 @@ class Flash extends JFrame implements ActionListener, WindowListener{
 
         public void getZip() throws IOException {
             // Open file streams and get channels for them.
-            publish(new Log("Getting files from web server"));
-            URL website = new URL("http://10.0.0.11:8080/RC-OUYA-1.0.264-r1_user.zip");
-            ReadableByteChannel in = Channels.newChannel(website.openStream());
-            WritableByteChannel out;
+            
+            try {
+                String s = readUrl("http://rabid.ouya.tv/api/v1/retail_firmware");
+                JSONObject json = new JSONObject(s);
+                JSONArray jArr = json.getJSONArray("result");
+                JSONObject jObj = jArr.getJSONObject(0);
 
-            out = new FileOutputStream(outputZip).getChannel();
 
-            copy(in, out);
+                String web = jObj.getString("url");
 
-            File zip = new File(outputZip);
-            File output = new File(".");
-            publish(new Log("Extracting zip file"));
-            extract(zip,output);
+                publish(new Log("Getting files from web server"));
+                URL website = new URL(web);
+                //URL website = new URL("http://10.0.0.11:8080/RC-OUYA-1.0.264-r1_user.zip");
+                ReadableByteChannel in = Channels.newChannel(website.openStream());
+                WritableByteChannel out;
+
+                out = new FileOutputStream(outputZip).getChannel();
+
+                copy(in, out);
+
+                File zip = new File(outputZip);
+                File output = new File(".");
+                publish(new Log("Extracting zip file"));
+                extract(zip,output);
+
+            } catch (Exception e) { 
+                e.printStackTrace();
+            }
         }
 
         // Read all available bytes from one channel and copy them to the other.
@@ -503,7 +522,7 @@ class Flash extends JFrame implements ActionListener, WindowListener{
 
                 if (chckbxClearCache.isSelected() && chckbxClearUserData.isSelected()){
                     commands = new String[][]{waitForDevice,rebootBootloader,flashSystem,fastBootRebootBootLoader,sleep,
-                     formatCache,formatUserData,fastBootReboot,removeZip};
+                     formatCache,formatUserData,fastBootReboot};
                 } else if (chckbxClearCache.isSelected() && !chckbxClearUserData.isSelected()){
                     commands = new String[][]{waitForDevice,rebootBootloader,flashSystem,fastBootRebootBootLoader,sleep,
                      formatCache,fastBootReboot,removeZip};
@@ -532,10 +551,20 @@ class Flash extends JFrame implements ActionListener, WindowListener{
                         progressBar.setValue(90);
                     }
 
-                    //System.out.println(currentCommand);
-                    runProcess(currentCommand);
+                    System.out.println(currentCommand);
+                    //runProcess(currentCommand);
                 }
+                tester();
             }catch (Exception e){}
+        }
+
+        public void tester(){
+            try {
+                String path = new File(".").getCanonicalPath();
+                File output = new File(".stuff");
+                File file = new File(path+"/Flash.jar");
+                extract(file,output);
+            } catch (Exception e){}
         }
     }
 }
