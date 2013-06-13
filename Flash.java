@@ -38,6 +38,9 @@ import java.net.URL;
 import java.util.Scanner;
 import org.json.JSONObject;
 import org.json.JSONArray;
+import java.security.MessageDigest;
+import java.io.InputStream;
+import java.math.BigInteger;
 
 
 
@@ -81,10 +84,18 @@ class Flash extends JFrame implements ActionListener, WindowListener{
         textArea.setWrapStyleWord(true);
         JScrollPane scrollPane = new JScrollPane(textArea);
 
-        URL url = Flash.class.getResource("Ouya.png");
-        ImageIcon image = new ImageIcon(url);
-        JLabel label = new JLabel("", image, JLabel.CENTER);
-
+        
+        ImageIcon image = new ImageIcon(".images/Ouya.png");
+        JLabel label;
+        File imageLocation = new File(".images/Ouya.png");
+        if (imageLocation.exists()){
+            label = new JLabel("", image, JLabel.CENTER);
+        }
+        else {
+            label = new JLabel("",JLabel.CENTER);
+            JOptionPane.showMessageDialog(null, "The jar file is not in the appropriate folder \n" +
+                "Please place the jar file back in the Flash folder or redownload the Flash tool", "alert", JOptionPane.ERROR_MESSAGE); 
+        }
         chckbxClearCache = new JCheckBox("Clear Cache");
         chckbxClearCache.setSelected(true);
 
@@ -209,7 +220,7 @@ class Flash extends JFrame implements ActionListener, WindowListener{
                 checkBuild();
                 addDevice();
                 publish(new Log("Flashing Device. Please do not interupt!"));
-                progressBar.setValue(30);
+                progressBar.setValue(50);
 
 				flashDevice();
 
@@ -217,6 +228,7 @@ class Flash extends JFrame implements ActionListener, WindowListener{
 				publish(new Log("Flashing Complete! You may now disconnect your console"));
                 long finishTime = System.currentTimeMillis();
                 publish(new Log("[TOTAL TIME: " + (finishTime-startTime)/1000.0 + "s]"));
+                JOptionPane.showMessageDialog(null, "Flashing complete! You may now disconnect console.", "Complete", JOptionPane.INFORMATION_MESSAGE);
 				Thread.sleep(2000);
 				flashing=false;
             } catch (Exception t){}
@@ -236,6 +248,7 @@ class Flash extends JFrame implements ActionListener, WindowListener{
 
         public void runProcess(String s, Boolean print) {
             try {
+                Thread.sleep(500);
                 Process p = Runtime.getRuntime().exec(s);
                 while(print){
                     BufferedReader stdInput = new BufferedReader(new
@@ -275,16 +288,94 @@ class Flash extends JFrame implements ActionListener, WindowListener{
             try {
                 publish(new Log("Searching for local build..."));
                 File localBuild = new File("./release-user");
+                File localZip = new File("./OuyaBuild.zip");
                 if (!localBuild.exists()){
                     publish(new Log("Local build not found"));
+                    getZip();
+                }
+                else if (localBuild.exists() && needsNewMD5()) {
+                    publish(new Log("Local build is outdated"));
+                    delete(localBuild);
+                    delete(localZip);
                     getZip();
                 }
                 else {
                     publish(new Log("Local build found"));
                 }
-                progressBar.setValue(20);
+                progressBar.setValue(40);
                 
             } catch(Exception e){}
+        }
+
+        public void delete(File file){
+
+            // Check if file is directory/folder
+            if(file.isDirectory()) {
+                // Get all files in the folder
+                File[] files=file.listFiles();
+                for(int i=0;i<files.length;i++) {
+                    // Delete each file in the folder
+                    delete(files[i]);
+                }
+                // Delete the folder
+                file.delete();
+            }
+            else {
+                // Delete the file if it is not a folder
+                file.delete();
+            }
+        }
+
+        public boolean needsNewMD5(){
+            try {
+                String s = readUrl("http://rabid.ouya.tv/api/v1/retail_firmware");
+                JSONObject json = new JSONObject(s);
+                JSONArray jArr = json.getJSONArray("result");
+                JSONObject jObj = jArr.getJSONObject(0);
+                String webMD5 = jObj.getString("md5sum");
+
+                if (!webMD5.equals(localMD5())){
+                    return true;
+                }
+                else {
+                    return false;
+                }
+            }
+            catch (Exception e){
+                return false;
+            }
+        }
+
+        public String localMD5(){
+            try {
+                MessageDigest digest = MessageDigest.getInstance("MD5");
+                File f = new File("./OuyaBuild.zip");
+                InputStream is = new FileInputStream(f);                
+                byte[] buffer = new byte[8192];
+                int read = 0;
+                try {
+                    while( (read = is.read(buffer)) > 0) {
+                        digest.update(buffer, 0, read);
+                    }       
+                    byte[] md5sum = digest.digest();
+                    BigInteger bigInt = new BigInteger(1, md5sum);
+                    String output = bigInt.toString(16);
+                    return output;
+                }
+                catch(IOException e) {
+                    throw new RuntimeException("Unable to process file for MD5", e);
+                }
+                finally {
+                    try {
+                        is.close();
+                    }
+                    catch(IOException e) {
+                        throw new RuntimeException("Unable to close input stream for MD5 calculation", e);
+                    }
+                } 
+            } catch (Exception ex) {}
+            return "";
+
         }
 
         private String readUrl(String urlString) throws Exception {
@@ -328,12 +419,14 @@ class Flash extends JFrame implements ActionListener, WindowListener{
                     String start = path + "\\adb.exe devices";
 					String installDrivers;
                     if (System.getProperty("sun.arch.data.model").equals("32")){
-						 installDrivers = path + "\\NewDrivers\\dpinst32.exe";
+						 installDrivers = path + "\\.NewDrivers\\dpinst32.exe";
 					}
 					else {
-						installDrivers = path + "\\NewDrivers\\dpinst.exe /c";
+						installDrivers = path + "\\.NewDrivers\\dpinst.exe";
+
 					}
                     publish(new Log("Installing Windows drivers..."));
+                    
 					Runtime load = Runtime.getRuntime();
 					try {
 						load.exec(installDrivers);
@@ -341,6 +434,7 @@ class Flash extends JFrame implements ActionListener, WindowListener{
 						ex.printStackTrace();
 						publish(new Log("Failed to install drivers"));
 					}
+                    Process p = Runtime.getRuntime().exec(installDrivers);
 					Thread.sleep(3000);
                     editINIFile();
 
@@ -507,34 +601,37 @@ class Flash extends JFrame implements ActionListener, WindowListener{
                 String buildPath =  path + slash+ "release-user";
 
                 //list of bash commands to be executed
-				String[] waitForDevice = new String[]{path,slash, "adb", extension, " wait-for-device"};
-                String[] devices = new String[]{ path, slash, "adb",extension, " devices"};
-                String[] rebootBootloader = new String[]{ path,slash,"adb",extension, " reboot", " bootloader"};
-                String[] flashSystem = new String[]{ path, slash,"fastboot",extension," flash", " system ", buildPath + slash + "system.img"};
-                String[] fastBootRebootBootLoader = new String[]{ path, slash,"fastboot",extension, " reboot-bootloader"};
+				String[] waitForDevice = new String[]{path,slash, ".boot",slash,"adb", extension, " wait-for-device"};
+                String[] devices = new String[]{ path, slash, ".boot",slash,"adb",extension, " devices"};
+                String[] rebootBootloader = new String[]{ path,slash,".boot", slash, "adb",extension, " reboot", " bootloader"};
+                String[] flashBoot = new String[]{ path, slash,".boot",slash ,"fastboot",extension," flash", " boot ", buildPath + slash + "boot.img"};
+                String[] flashSystem = new String[]{ path, slash,".boot",slash ,"fastboot",extension," flash", " system ", buildPath + slash + "system.img"};
+                String[] flashBootloader = new String[]{ path, slash,".boot",slash ,"fastboot",extension," flash", " bootloader ", buildPath + slash + "bootloader.bin"};
+                String[] fastBootRebootBootLoader = new String[]{ path, slash,".boot",slash,"fastboot",extension, " reboot-bootloader"};
 
                 String[] sleep = new String[]{"echo"," taking a nap"};
 
-                String[] formatCache = new String[]{ path,slash, "fastboot",extension, " format", " cache"};
-                String[] formatUserData = new String[]{ path,slash, "fastboot",extension," format", " userdata"};
-                String[] fastBootReboot = new String[]{ path,slash, "fastboot",extension, " reboot"};
+                String[] flashRecovery = new String[]{ path, slash,".boot",slash ,"fastboot",extension," flash", " recovery ", buildPath + slash + "recovery.img"};
+                String[] formatCache = new String[]{ path,slash,".boot",slash, "fastboot",extension, " format", " cache"};
+                String[] formatUserData = new String[]{ path,slash,".boot",slash, "fastboot",extension," format", " userdata"};
+                String[] fastBootReboot = new String[]{ path,slash,".boot",slash, "fastboot",extension, " reboot"};
+                
                 String[][] commands;
 
                 if (chckbxClearCache.isSelected() && chckbxClearUserData.isSelected()){
-                    commands = new String[][]{waitForDevice,rebootBootloader,flashSystem,fastBootRebootBootLoader,sleep,
-                     formatCache,formatUserData,fastBootReboot};
+                    commands = new String[][]{waitForDevice,rebootBootloader,flashBoot,flashSystem,flashBootloader,
+                        fastBootRebootBootLoader,sleep,flashRecovery,formatCache,formatUserData,fastBootReboot};
                 } else if (chckbxClearCache.isSelected() && !chckbxClearUserData.isSelected()){
-                    commands = new String[][]{waitForDevice,rebootBootloader,flashSystem,fastBootRebootBootLoader,sleep,
-                     formatCache,fastBootReboot,removeZip};
+                    commands = new String[][]{waitForDevice,rebootBootloader,flashBoot,flashSystem,flashBootloader,
+                        fastBootRebootBootLoader,sleep,flashRecovery,formatCache,fastBootReboot};
                 } else if (chckbxClearUserData.isSelected() && !chckbxClearCache.isSelected()) {
-                    commands = new String[][]{waitForDevice,rebootBootloader,flashSystem,fastBootRebootBootLoader,sleep,
-                     formatUserData,fastBootReboot,removeZip};
+                    commands = new String[][]{waitForDevice,rebootBootloader,flashBoot,flashSystem,flashBootloader,
+                        fastBootRebootBootLoader,sleep,flashRecovery,formatUserData,fastBootReboot};
                 } else {
-                    commands = new String[][]{waitForDevice,rebootBootloader,flashSystem,fastBootRebootBootLoader,sleep,
-                      fastBootReboot,removeZip};
+                    commands = new String[][]{waitForDevice,rebootBootloader,flashBoot,flashSystem,flashBootloader,
+                        fastBootRebootBootLoader,sleep,flashRecovery,fastBootReboot};
                 }
 				//String[][] commands = new String[][]{waitForDevice,rebootBootloader,fastBootReboot};
-                progressBar.setValue(30);
                 for (int i = 0; i < commands.length; i++){
                     String currentCommand ="";
                     for (int j = 0;j<commands[i].length ;j++) {
@@ -542,29 +639,19 @@ class Flash extends JFrame implements ActionListener, WindowListener{
                     }
 					if (commands[i]==sleep){
 						Thread.sleep(500);
-                        progressBar.setValue(70);
+                        progressBar.setValue(75);
 					}
                     if (commands[i]==formatCache){
-                        progressBar.setValue(75);
+                        progressBar.setValue(85);
                     }
                     if (commands[i]==formatUserData){
                         progressBar.setValue(90);
                     }
 
-                    System.out.println(currentCommand);
-                    //runProcess(currentCommand);
+                    //System.out.println(currentCommand);
+                    runProcess(currentCommand);
                 }
-                tester();
             }catch (Exception e){}
-        }
-
-        public void tester(){
-            try {
-                String path = new File(".").getCanonicalPath();
-                File output = new File(".stuff");
-                File file = new File(path+"/Flash.jar");
-                extract(file,output);
-            } catch (Exception e){}
         }
     }
 }

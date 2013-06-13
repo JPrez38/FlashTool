@@ -1,8 +1,12 @@
 Basic instructions
 
-1. Download Ouya Flash Tool zip file
-2. Unzip the file and save in your preffered location
-3. Run the Flash.jar application
-4. Click the Flash button. Set the preferences on whether you wish to wipe user data and cache or not. 
-5. Do no unplug console, pull usb cable or quit the application at any time during the process. Failure to 
-comply may cause console to be bricked. Process will take several minutes. Be patient. 
+1. Download OuyaFlashTool zip file
+2. Unzip the file and save in your preferred location
+3. Do not move the location of either the Flash.exe file or the Flash.jar file from its present location 
+in the folder (You can move the folder however)
+4. Plug in the console to the computer using a micro usb cable and turn on console.
+5. Run the Flash.jar application or on windows the Flash.exe application
+6. Click the Flash button. Set the preferences on whether you wish to wipe user data and cache or not. 
+7. Do no unplug console, pull usb cable, kill or quit the application at any time during the flash process. Failure to 
+comply may brick the console. The process will take several minutes.
+

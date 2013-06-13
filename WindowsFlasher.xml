@@ -1,0 +1,22 @@
+<launch4jConfig>
+  <dontWrapJar>false</dontWrapJar>
+  <headerType>gui</headerType>
+  <jar>/Users/jacobpreston4/progs/Ouya/Flash/Flash.jar</jar>
+  <outfile>/Users/jacobpreston4/progs/Ouya/Flash/Flash.exe</outfile>
+  <errTitle></errTitle>
+  <cmdLine></cmdLine>
+  <chdir></chdir>
+  <priority>normal</priority>
+  <downloadUrl>http://java.com/download</downloadUrl>
+  <supportUrl></supportUrl>
+  <customProcName>false</customProcName>
+  <stayAlive>false</stayAlive>
+  <manifest>/Users/jacobpreston4/progs/Ouya/Flash/Flash.manifest</manifest>
+  <icon></icon>
+  <jre>
+    <path>.java/jre7</path>
+    <minVersion></minVersion>
+    <maxVersion></maxVersion>
+    <jdkPreference>preferJre</jdkPreference>
+  </jre>
+</launch4jConfig>
