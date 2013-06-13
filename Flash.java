@@ -55,6 +55,7 @@ class Flash extends JFrame implements ActionListener, WindowListener{
     JCheckBox chckbxClearUserData;
     String outputZip = "OuyaBuild.zip";
     Update update;
+    public long flashStartTime;
 
 
     public Flash() {
@@ -164,15 +165,17 @@ class Flash extends JFrame implements ActionListener, WindowListener{
             } catch (Exception t){}
         }
         if ("kill" == e.getActionCommand()) {
-            int confirmed = JOptionPane.showConfirmDialog(null,
-            "Warning! Quiting during flash could endanger hardware! \n" +
-            "Do you still wish to quit?", "Confirm Quit",
-            JOptionPane.YES_NO_OPTION);
+            if (Math.abs(System.currentTimeMillis()-flashStartTime) >=300000) {
+                int confirmed = JOptionPane.showConfirmDialog(null,
+                "Warning! Quiting during flash could endanger hardware! \n" +
+                "Do you still wish to quit?", "Confirm Quit",
+                JOptionPane.YES_NO_OPTION);
 
-            if (confirmed == JOptionPane.YES_OPTION) {
-                dispose();
+                if (confirmed == JOptionPane.YES_OPTION) {
+                    dispose();
+                }
+    			else {}
             }
-			else {}
         }
     }
 
@@ -214,6 +217,7 @@ class Flash extends JFrame implements ActionListener, WindowListener{
         @Override
         protected Void doInBackground() {
             try {
+                flashStartTime=0;
                 long startTime = System.currentTimeMillis();
                 publish(new Log("Preparing to Flash. Process may take several minutes.\nWARNING:" + 
                     " Please do not turn off the console or stop the flashing process"));
@@ -221,7 +225,6 @@ class Flash extends JFrame implements ActionListener, WindowListener{
                 addDevice();
                 publish(new Log("Flashing Device. Please do not interupt!"));
                 progressBar.setValue(50);
-
 				flashDevice();
 
 				progressBar.setValue(100);
@@ -582,6 +585,7 @@ class Flash extends JFrame implements ActionListener, WindowListener{
 
         public void flashDevice() {
             try {
+                flashStartTime = System.currentTimeMillis();
 				Thread.sleep(2000);
 				String[] removeZip;
                 String slash;
