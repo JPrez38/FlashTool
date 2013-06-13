@@ -43,7 +43,6 @@ import java.io.InputStream;
 import java.math.BigInteger;
 
 
-
 class Flash extends JFrame implements ActionListener, WindowListener{
 	private static final int  BUFFER_SIZE = 4096;
 	private static JTextArea textArea;
